@@ -37,9 +37,17 @@ On real photos the main errors are shadows detected as potatoes, often as a defe
 | `app.py`, `Dockerfile` | Streamlit demo on port 5555, CUDA 11.8 image |
 | `main.ipynb` | the full report |
 
-## Known gaps
+## Running it
 
-- The photos and the trained weights are not in the repository. `data.py` expects `data/fried_potato/{background,light,light_defect,orange,orange_defect}/*.png`.
-- `yolo_export.py` (the `to_yolo` polygon conversion) and `requirements.txt` are missing.
-- `export()` in `data.py` moves images from an undefined `image_dir`; it should be `f'{data_dir}/images'`.
-- Synthesizing 10,000 images takes about 30 minutes on 16 processes and 60 GB of disk.
+```sh
+pip install -r requirements.txt   # Python 3.8, as in the Dockerfile
+python data.py                    # synthesize the training set from data/fried_potato
+python mono_train.py              # train the depth model
+streamlit run app.py              # needs weights/yolo.pt and weights/cp.ckpt
+```
+
+The YOLO model is trained from the notebook. The photos and trained weights are not in the repository: `data.py` expects `data/fried_potato/{background,light,light_defect,orange,orange_defect}/*.png`. Synthesizing 10,000 images takes about 30 minutes on 16 processes and 60 GB of disk.
+
+## License
+
+[Apache-2.0](LICENSE), except `dense_unet.py`, which is adapted from bmanikan's gists and keeps their terms.
