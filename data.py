@@ -167,7 +167,7 @@ def export(data, data_dir, splits_list, classes, imwidth, imheight):
         label_path = f'{data_dir}/labels/{splits_list[i]}/{i + 1}.txt'
         os.makedirs(os.path.dirname(image_path), exist_ok=True)
         os.makedirs(os.path.dirname(label_path), exist_ok=True)
-        shutil.move(f'{image_dir}/{i + 1}.png', image_path)
+        shutil.move(f'{data_dir}/images/{i + 1}.png', image_path)
         yolos = [] 
         for inst in data[i]:
             pts = to_yolo(inst['segmentation'], imwidth, imheight) 
@@ -199,6 +199,21 @@ def export(data, data_dir, splits_list, classes, imwidth, imheight):
         fout.writelines(depth_splits[1] )
 
 
+_worker = {}
+
+
+def _init_worker(patches, backgrounds):
+    _worker.update(patches=patches, backgrounds=backgrounds)
+
+
+def _generate_image(index):
+    np.random.seed(index)
+    image, instances, depth_mask = create_image(_worker['patches'], _worker['backgrounds'], patches_mean, patches_std)
+    cv2.imwrite(f'{data_dir}/images/{index}.png', image)
+    cv2.imwrite(f'{data_dir}/depth/{index}.png', depth_mask)
+    return instances
+
+
 def generate_data():        
     '''
         Wrap above functions to perform segmenation and data generation 
@@ -216,17 +231,10 @@ def generate_data():
             os.makedirs(f'{data_dir}/patches/{patch["label"]}', exist_ok=True)
             cv2.imwrite(f'{data_dir}/patches/{patch["label"]}/{i}.png', patch['image'])
     
-    def _call_(index):
-        np.random.seed(index)
-        image, instances, depth_mask = create_image(patches, backgrounds, patches_mean, patches_std)
-        os.makedirs(f'{data_dir}/images', exist_ok=True)
-        os.makedirs(f'{data_dir}/depth', exist_ok=True)
-        cv2.imwrite(f'{data_dir}/images/{index}.png', image) 
-        cv2.imwrite(f'{data_dir}/depth/{index}.png', depth_mask) 
-        return instances
-
-    pool = Pool(16)
-    data = list(tqdm(pool.imap(_call_, range(1, image_count + 1)), 'augmentation', total=image_count))    
+    os.makedirs(f'{data_dir}/images', exist_ok=True)
+    os.makedirs(f'{data_dir}/depth', exist_ok=True)
+    with Pool(16, initializer=_init_worker, initargs=(patches, backgrounds)) as pool:
+        data = list(tqdm(pool.imap(_generate_image, range(1, image_count + 1)), 'augmentation', total=image_count))
     splits_list = sum([[k] * int(v * image_count) for k, v in splits.items()], [])
     export(data, data_dir, splits_list, classes, imwidth, imheight)
     
